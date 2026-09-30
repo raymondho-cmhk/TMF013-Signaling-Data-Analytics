@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: TMF013 Signaling Data Transformation & Analytics API
+  version: 1.0.0
+  description: |
+    Standardized API for extracting, transforming, and analyzing 3GPP signaling data (S1-MME, S6a, N1, etc.).
+    Supports Closed-Loop Operational Models via:
+    - **Reactive (On-Demand)**: /analysisTask (e.g., Roaming Troubleshoot, Fault Analysis)
+    - **Proactive (Event-Driven)**: /sub & MonitoredSubscriber (e.g., Device-SIM Binding, Geo-Anomaly)
+    - **Rule Management**: /analysisRule
+  contact:
+    name: CMHK Core Network Capability Openness Team
+servers:
+  - url: https://msb.cmhk.com/tmf-api/signalingDataAnalytics/v1
+    description: CMHK MSB Gateway
+paths:
+  /analysisRule:
+    post:
+      summary: Create an Analysis Rule (UC4)
+      tags: [Rule Management]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnalysisRule' }
+      responses:
+        '201':
+          description: Created
+  /analysisRule/{id}:
+    get:
+      summary: Query Analysis Rule (UC3)
+      tags: [Rule Management]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalysisRule' }
+    patch:
+      summary: Update Analysis Rule (UC5)
+      tags: [Rule Management]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnalysisRule' }
+      responses:
+        '200':
+          description: Updated
+  /analysisTask:
+    post:
+      summary: Submit a Signaling Analysis Task (Reactive - UC1)
+      tags: [Reactive Analysis]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignalingAnalysisTask' }
+      responses:
+        '201':
+          description: Task Accepted / Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignalingAnalysisTask' }
+  /analysisTask/{id}:
+    get:
+      summary: Get Task Status and Result (Reactive - UC1)
+      tags: [Reactive Analysis]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Task status and result reference
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignalingAnalysisTask' }
+  /sub:
+    post:
+      summary: Subscribe to Suspicious Behavior Detection (Proactive - UC2)
+      tags: [Proactive Monitoring]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MonitoredSubscriber' }
+      responses:
+        '201':
+          description: Subscription Accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonitoredSubscriber' }
+components:
+  schemas:
+    AnalysisRule:
+      type: object
+      properties:
+        id: { type: string, example: "Rule_SimSwap_001" }
+        ruleName: { type: string, example: "Device-SIM Binding Security Detection" }
+        algorithmModel: { type: string, example: "ECGI_IMEI_Correlation_Model" }
+        threshold: { type: number, example: 0.85 }
+        severity: { type: string, enum: [Critical, Major, Warning], example: "Critical" }
+    SignalingAnalysisTask:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        name: { type: string, example: "VIP Roaming Fault Analysis" }
+        creationDate: { type: string, format: date-time, readOnly: true }
+        status: { type: string, enum: [Accepted, InProgress, Completed, Failed], readOnly: true }
+        analysisTimeWindow: { $ref: '#/components/schemas/TimePeriod' }
+        targetEntity: { $ref: '#/components/schemas/RelatedEntity' }
+        analysisRule: 
+          type: array
+          items: { $ref: '#/components/schemas/RelatedEntity' }
+        result: { $ref: '#/components/schemas/SignalingAnalysisResult' }
+    SignalingAnalysisResult:
+      type: object
+      properties:
+        id: { type: string }
+        conclusion: { type: string, example: "AnomalyDetected" }
+        riskScore: { type: integer, example: 85 }
+        rootCause: { type: string, example: "Location Mismatch: ECGI density and Visited-PLMN-Id inconsistency" }
+        relatedEvents:
+          type: array
+          items: { $ref: '#/components/schemas/SignalingEvent' }
+    MonitoredSubscriber:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        imsi: { type: string, example: "454120820065037" }
+        msisdn: { type: string, example: "852513239112752" }
+        monitoringStatus: { type: string, enum: [Active, Suspended], example: "Active" }
+        subscribedRules:
+          type: array
+          items: { $ref: '#/components/schemas/RelatedEntity' }
+    SignalingEvent:
+      type: object
+      properties:
+        id: { type: string }
+        eventTime: { type: string, format: date-time }
+        protocolType: { type: string, enum: [S1MME, N1N2, S6a, N8, S1, N1], example: "S6a" }
+        interfaceId: { type: string, example: "MME_AMF_01" }
+        faultCode: { type: string, example: "5422" }
+        geoLocation: { type: string, description: "GeoJSON string", example: "{\"type\":\"Point\",\"coordinates\":[114.1694,22.3193]}" }
+    TimePeriod:
+      type: object
+      properties:
+        startDateTime: { type: string, format: date-time, example: "2026-03-30T00:00:00Z" }
+        endDateTime: { type: string, format: date-time, example: "2026-03-31T00:00:00Z" }
+    RelatedEntity:
+      type: object
+      properties:
+        id: { type: string, example: "454001234567890" }
+        role: { type: string, example: "IMSI" }
